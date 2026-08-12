@@ -1,0 +1,31 @@
+# Secrets and local configuration
+config.local.php
+.env
+.env.*
+!.env.example
+
+# Local databases and runtime data
+data/
+*.sqlite
+*.sqlite3
+*.db
+*.sqlitedb
+
+# User uploads and generated files
+uploads/products/*
+!uploads/products/.htaccess
+uploads/*
+!uploads/products/
+!uploads/products/.htaccess
+
+# Logs, backups, dumps, and editor/system files
+*.log
+*.bak
+*.backup
+*.dump
+*.sql~
+*.zip
+*.tar
+*.gz
+.DS_Store
+Thumbs.db

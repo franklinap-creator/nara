@@ -1,0 +1,9 @@
+.git
+.gitignore
+config.local.php
+data/
+uploads/products/*
+admin/setup.php
+*.sql
+*.sqlite
+*.db
