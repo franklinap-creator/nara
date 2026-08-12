@@ -3,6 +3,8 @@ services:
     name: nara-store
     runtime: docker
     plan: free
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
     healthCheckPath: /
     envVars:
       - key: DB_HOST

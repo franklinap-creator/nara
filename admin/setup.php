@@ -23,8 +23,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     if (!$name || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
         $error = 'Enter a valid name and email.';
-    } elseif (strlen($password) < 8) {
-        $error = 'Password must be at least 8 characters.';
+    } elseif (strlen($password) < 12 || !preg_match('/[A-Z]/', $password) || !preg_match('/[a-z]/', $password) || !preg_match('/\d/', $password)) {
+        $error = 'Password must be at least 12 characters and include uppercase, lowercase, and a number.';
     } else {
         $stmt = db()->prepare('INSERT INTO admins (name, email, password_hash) VALUES (?, ?, ?)');
         $stmt->execute([$name, $email, password_hash($password, PASSWORD_DEFAULT)]);
@@ -61,7 +61,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     <input type="email" name="email" required>
                 </label>
                 <label>Password
-                    <input type="password" name="password" minlength="8" required>
+                    <input type="password" name="password" minlength="12" pattern="(?=.*[A-Z])(?=.*[a-z])(?=.*\d).{12,}" required>
                 </label>
                 <button class="button" type="submit" style="width:100%;justify-content:center;">Create account</button>
             </form>

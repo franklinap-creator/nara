@@ -7,18 +7,32 @@ $DB_NAME = getenv('DB_NAME') ?: 'product-card';
 
 function db(): PDO
 {
-    global $DB_HOST, $DB_USER, $DB_PASS, $DB_NAME;
+    global $DB_HOST, $DB_PORT, $DB_USER, $DB_PASS, $DB_NAME;
     static $pdo;
     if ($pdo instanceof PDO) return $pdo;
 
-    try {
-        $pdo = new PDO("mysql:host=$DB_HOST;port=$DB_PORT;dbname=$DB_NAME;charset=utf8mb4", $DB_USER, $DB_PASS);
-    } catch (PDOException $e) {
-        die("Database connection failed: " . $e->getMessage());
+    if (!extension_loaded('pdo_mysql')) {
+        error_log('Nara database error: pdo_mysql extension is not loaded.');
+        http_response_code(500);
+        exit('Database driver is not available. Enable PHP PDO MySQL.');
     }
-    $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
-    $pdo->setAttribute(PDO::ATTR_DEFAULT_FETCH_MODE, PDO::FETCH_ASSOC);
-
+    try {
+        $pdo = new PDO(
+            "mysql:host=" . urlencode($DB_HOST) . ";port=" . (int)$DB_PORT . ";dbname=" . urlencode($DB_NAME) . ";charset=utf8mb4",
+            $DB_USER,
+            $DB_PASS,
+            [
+                PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+                PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+                PDO::ATTR_EMULATE_PREPARES => false,
+                PDO::ATTR_TIMEOUT => 5,
+            ]
+        );
+    } catch (PDOException $e) {
+        error_log('Nara database connection failed: ' . $e->getMessage());
+        http_response_code(500);
+        exit('Database connection failed. Check the database environment settings.');
+    }
     $pdo->exec('CREATE TABLE IF NOT EXISTS products (
         id INT AUTO_INCREMENT PRIMARY KEY,
         name VARCHAR(255) NOT NULL,
@@ -57,6 +71,15 @@ function db(): PDO
         email VARCHAR(255) NOT NULL UNIQUE,
         password_hash VARCHAR(255) NOT NULL,
         created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+    ) ENGINE=InnoDB');
+    $pdo->exec('CREATE TABLE IF NOT EXISTS admin_login_attempts (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        ip_address VARCHAR(45) NOT NULL,
+        email_hash CHAR(64) NOT NULL,
+        failed_attempts INT NOT NULL DEFAULT 0,
+        window_started_at DATETIME NOT NULL,
+        blocked_until DATETIME NULL,
+        UNIQUE KEY login_identity (ip_address, email_hash)
     ) ENGINE=InnoDB');
 
     if ((int)$pdo->query('SELECT COUNT(*) FROM products')->fetchColumn() === 0) {
@@ -225,6 +248,34 @@ function storeProductImage(array $file): string {
         throw new RuntimeException('The product image could not be saved.');
     }
     return 'uploads/products/' . $filename;
+}
+
+function loginAllowed(string $ip, string $email): bool {
+    $stmt = db()->prepare('SELECT blocked_until FROM admin_login_attempts WHERE ip_address = ? AND email_hash = ? LIMIT 1');
+    $stmt->execute([$ip, hash('sha256', strtolower(trim($email)))]);
+    $blockedUntil = $stmt->fetchColumn();
+    return !$blockedUntil || strtotime((string)$blockedUntil) <= time();
+}
+
+function recordLoginFailure(string $ip, string $email): void {
+    $hash = hash('sha256', strtolower(trim($email)));
+    $pdo = db();
+    $stmt = $pdo->prepare('SELECT * FROM admin_login_attempts WHERE ip_address = ? AND email_hash = ? LIMIT 1');
+    $stmt->execute([$ip, $hash]);
+    $row = $stmt->fetch();
+    $now = date('Y-m-d H:i:s');
+    if (!$row || strtotime($row['window_started_at']) < time() - 900) {
+        if ($row) $pdo->prepare('UPDATE admin_login_attempts SET failed_attempts=1,window_started_at=?,blocked_until=NULL WHERE id=?')->execute([$now, $row['id']]);
+        else $pdo->prepare('INSERT INTO admin_login_attempts (ip_address,email_hash,failed_attempts,window_started_at) VALUES (?,?,1,?)')->execute([$ip, $hash, $now]);
+        return;
+    }
+    $attempts = (int)$row['failed_attempts'] + 1;
+    $blockedUntil = $attempts >= 5 ? date('Y-m-d H:i:s', time() + 900) : null;
+    $pdo->prepare('UPDATE admin_login_attempts SET failed_attempts=?,blocked_until=? WHERE id=?')->execute([$attempts, $blockedUntil, $row['id']]);
+}
+
+function clearLoginFailures(string $ip, string $email): void {
+    db()->prepare('DELETE FROM admin_login_attempts WHERE ip_address=? AND email_hash=?')->execute([$ip, hash('sha256', strtolower(trim($email)))]);
 }
 
 function product_by_slug(string $slug): ?array {

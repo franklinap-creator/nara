@@ -13,13 +13,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     requireCsrf();
     $email = trim($_POST['email'] ?? '');
     $password = $_POST['password'] ?? '';
-    $found = adminByEmail($email);
+    $ip = $_SERVER['REMOTE_ADDR'] ?? 'unknown';
+    $found = loginAllowed($ip, $email) ? adminByEmail($email) : null;
 
     if ($found && password_verify($password, $found['password_hash'])) {
+        clearLoginFailures($ip, $email);
         session_regenerate_id(true);
         $_SESSION['admin_id'] = $found['id'];
         header('Location: index.php'); exit;
     }
+    recordLoginFailure($ip, $email);
     $error = 'Invalid email or password.';
 }
 ?>

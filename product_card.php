@@ -1,17 +1,24 @@
 <?php if (!isset($item)) return; ?>
-<article class="product-card"><a href="index.php?page=product&id=<?= $item['id'] ?>">
-        <div class="product-image"><img src="<?= htmlspecialchars($item['image']) ?>"
-                alt="<?= htmlspecialchars($item['name']) ?>"><?php if ($item['badge']): ?><span
-                class="badge"><?= htmlspecialchars($item['badge']) ?></span><?php endif; ?><form method="post"
-                class="quick-add"><?= csrfField() ?><input type="hidden" name="action" value="add"><input type="hidden" name="product_id"
-                    value="<?= $item['id'] ?>"><button
-                    aria-label="Add <?= htmlspecialchars($item['name']) ?> to bag">+</button></form>
-        </div>
-    </a>
+<article class="product-card">
+    <div class="product-image">
+        <a href="index.php?page=product&id=<?= (int)$item['id'] ?>" class="product-image-link">
+            <img src="<?= htmlspecialchars($item['image']) ?>" alt="<?= htmlspecialchars($item['name']) ?>">
+        </a>
+        <?php if ($item['badge']): ?>
+            <span class="badge"><?= htmlspecialchars($item['badge']) ?></span>
+        <?php endif; ?>
+        <form method="post" class="quick-add">
+            <?= csrfField() ?>
+            <input type="hidden" name="action" value="add">
+            <input type="hidden" name="product_id" value="<?= (int)$item['id'] ?>">
+            <button type="submit" aria-label="Add <?= htmlspecialchars($item['name']) ?> to bag">+</button>
+        </form>
+    </div>
     <div class="product-info">
         <div>
-            <h3><?= htmlspecialchars($item['name']) ?></h3>
+            <h3><a href="index.php?page=product&id=<?= (int)$item['id'] ?>"><?= htmlspecialchars($item['name']) ?></a></h3>
             <p><?= htmlspecialchars($item['category']) ?></p>
-        </div><strong><?= money((int)$item['price']) ?></strong>
+        </div>
+        <strong><?= money((int)$item['price']) ?></strong>
     </div>
 </article>
